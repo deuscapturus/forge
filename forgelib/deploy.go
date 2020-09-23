@@ -3,12 +3,12 @@ package forgelib
 import (
 	"encoding/json"
 	"fmt"
-
-	"github.com/ghodss/yaml"
+	"strings"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/cloudformation"
+	"github.com/minio/minio/pkg/wildcard"
 	"github.com/pkg/errors"
 )
 
@@ -18,8 +18,86 @@ type DeployOut struct {
 	Message string
 }
 
+type PolicyDocument struct {
+	Statement []StatementEntry
+}
+
+type StatementEntry struct {
+	Effect      string                         `json:",omitempty"`
+	Action      interface{}                    `json:",omitempty"` // May be string or []string
+	NotAction   string                         `json:",omitempty"`
+	Principal   string                         `json:",omitempty"`
+	Resource    string                         `json:",omitempty"`
+	NotResource string                         `json:",omitempty"`
+	Condition   map[string]map[string][]string `json:",omitempty"`
+}
+
+func recursiveSetStackPolicy(stackPolicyBody *string, stackName *string) error {
+	stackResourcesInput := cloudformation.DescribeStackResourcesInput{
+		StackName: stackName,
+	}
+	stackResources, err := cfnClient.DescribeStackResources(&stackResourcesInput)
+	if err != nil {
+		return err
+	}
+
+	var stackResouceLogicalNames []*string
+	var stackResourcNestedStacks []*string
+
+	for _, stackResource := range stackResources.StackResources {
+		if *stackResource.ResourceType == "AWS::CloudFormation::Stack" {
+			stackResourcNestedStacks = append(stackResourcNestedStacks, stackResource.PhysicalResourceId)
+		}
+		stackResouceLogicalNames = append(stackResouceLogicalNames, stackResource.LogicalResourceId)
+	}
+
+	var stackPolicy PolicyDocument
+	json.Unmarshal([]byte(*stackPolicyBody), &stackPolicy)
+
+	// filter stack policy. remove logical ids not included in this stack
+	var filteredStackPolicy PolicyDocument
+	for _, statementEntry := range stackPolicy.Statement {
+		var logicalNameSplit []string
+		if statementEntry.Resource != "" {
+			logicalNameSplit = strings.Split(statementEntry.Resource, "/")
+		} else if statementEntry.NotResource != "" {
+			logicalNameSplit = strings.Split(statementEntry.NotResource, "/")
+		}
+		logicalNamePattern := logicalNameSplit[len(logicalNameSplit)-1]
+		for _, stackResouceLogicalName := range stackResouceLogicalNames {
+			if wildcard.MatchSimple(logicalNamePattern, *stackResouceLogicalName) {
+				filteredStackPolicy.Statement = append(filteredStackPolicy.Statement, statementEntry)
+				break
+			}
+		}
+	}
+
+	jsonStackPolicy, err := json.Marshal(filteredStackPolicy)
+	if err != nil {
+		return err
+	}
+	jsonStackPolicyString := string(jsonStackPolicy)
+
+	setStackPolicyInput := cloudformation.SetStackPolicyInput{
+		StackName:       stackName,
+		StackPolicyBody: &jsonStackPolicyString,
+	}
+
+	cfnClient.SetStackPolicy(&setStackPolicyInput)
+
+	// For each nested stack recursiveSetStackPolicy()
+	for _, stackResourcNestedStack := range stackResourcNestedStacks {
+		err = recursiveSetStackPolicy(stackPolicyBody, stackResourcNestedStack)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+
+}
+
 // Deploy will create or update the stack (depending on its current state)
-func (s *Stack) Deploy() (output DeployOut, err error) {
+func (s *Stack) Deploy() (output DeployOut, postActions []func(), err error) {
 
 	var validateConfig cloudformation.ValidateTemplateInput
 
@@ -33,7 +111,7 @@ func (s *Stack) Deploy() (output DeployOut, err error) {
 
 	validationResult, err := cfnClient.ValidateTemplate(&validateConfig)
 	if err != nil {
-		return output, errors.Wrap(err, "Failed to Validate Template")
+		return output, postActions, errors.Wrap(err, "Failed to Validate Template")
 	}
 
 	// CAPABILITY_AUTO_EXPAND is not discovered during validation so add it here.  These lines may
@@ -46,7 +124,7 @@ func (s *Stack) Deploy() (output DeployOut, err error) {
 	if len(s.ParameterBodies) != 0 {
 		parsedParameters, err = parseParameters(s.ParameterBodies)
 		if err != nil {
-			return output, err
+			return output, postActions, err
 		}
 	}
 
@@ -92,7 +170,7 @@ TEMPLATE_PARAMETERS:
 
 		TemplateSummary, err := cfnClient.GetTemplateSummary(&templateSummaryConfig)
 		if err != nil {
-			return output, errors.Wrap(err, "Failed to get Template Summary")
+			return output, postActions, errors.Wrap(err, "Failed to get Template Summary")
 		}
 
 		type Metadata struct {
@@ -119,10 +197,10 @@ TEMPLATE_PARAMETERS:
 			case fmt.Sprintf("Stack with id %s does not exist", s.StackID),
 				fmt.Sprintf("Stack with id %s does not exist", s.StackName):
 			default:
-				return output, err
+				return output, postActions, err
 			}
 		} else {
-			return output, errors.Wrap(err, "Error in GetStackInfo")
+			return output, postActions, errors.Wrap(err, "Error in GetStackInfo")
 		}
 	}
 
@@ -130,7 +208,7 @@ TEMPLATE_PARAMETERS:
 	if s.TagsBody != "" {
 		tags, err = parseTags(s.TagsBody)
 		if err != nil {
-			return output, err
+			return output, postActions, err
 		}
 	} else if s.StackInfo != nil {
 		tags = s.StackInfo.Tags
@@ -140,19 +218,9 @@ TEMPLATE_PARAMETERS:
 	if s.CfnRoleName != "" {
 		roleARNString, err := roleARNFromName(s.CfnRoleName)
 		if err != nil {
-			return output, err
+			return output, postActions, err
 		}
 		roleARN = &roleARNString
-	}
-
-	var inputStackPolicy *string
-	if s.StackPolicyBody != "" {
-		jsonStackPolicy, err := yaml.YAMLToJSON([]byte(s.StackPolicyBody))
-		if err != nil {
-			return output, errors.Wrap(err, "Unable to convert template policy from YAML to JSON")
-		}
-		jsonStackPolicyString := string(jsonStackPolicy)
-		inputStackPolicy = &jsonStackPolicyString
 	}
 
 	createConfig := cloudformation.CreateStackInput{
@@ -162,7 +230,6 @@ TEMPLATE_PARAMETERS:
 		Tags:                        tags,
 		Parameters:                  inputParams,
 		RoleARN:                     roleARN,
-		StackPolicyBody:             inputStackPolicy,
 		EnableTerminationProtection: aws.Bool(s.TerminationProtection),
 	}
 
@@ -176,10 +243,20 @@ TEMPLATE_PARAMETERS:
 
 	if s.StackInfo == nil {
 		createOut, err := cfnClient.CreateStack(&createConfig)
+
+		if s.StackPolicyBody != "" {
+			postActions = append(postActions, func(stackPolicyBody string, stackId string) func() {
+				return func() {
+					recursiveSetStackPolicy(&stackPolicyBody, &stackId)
+				}
+			}(s.StackPolicyBody, *createOut.StackId))
+		}
+
 		if err != nil {
-			return output, errors.Wrap(err, "Failed to Create Stack")
+			return output, postActions, errors.Wrap(err, "Failed to Create Stack")
 		}
 		s.StackID = *createOut.StackId
+
 	} else {
 		// Only SET termination protection, do not remove
 		if s.StackInfo.EnableTerminationProtection != nil &&
@@ -192,17 +269,23 @@ TEMPLATE_PARAMETERS:
 				},
 			)
 			if err != nil {
-				return output, errors.Wrap(err, "Failed to Update Termination Protection")
+				return output, postActions, errors.Wrap(err, "Failed to Update Termination Protection")
+			}
+		}
+
+		if s.StackPolicyBody != "" {
+			err = recursiveSetStackPolicy(&s.StackPolicyBody, &s.StackID)
+			if err != nil {
+				return output, postActions, errors.Wrap(err, "Failed to Set Stack Policy")
 			}
 		}
 
 		updateConfig := cloudformation.UpdateStackInput{
-			StackName:       aws.String(s.StackID),
-			Capabilities:    validationResult.Capabilities,
-			Tags:            tags,
-			Parameters:      inputParams,
-			RoleARN:         roleARN,
-			StackPolicyBody: inputStackPolicy,
+			StackName:    aws.String(s.StackID),
+			Capabilities: validationResult.Capabilities,
+			Tags:         tags,
+			Parameters:   inputParams,
+			RoleARN:      roleARN,
 		}
 
 		if s.TemplateUrl != "" {
@@ -217,10 +300,10 @@ TEMPLATE_PARAMETERS:
 			if awsErr, ok := err.(awserr.Error); ok {
 				noUpdatesErr := "No updates are to be performed."
 				if awsErr.Message() == noUpdatesErr {
-					return DeployOut{Message: noUpdatesErr}, nil
+					return DeployOut{Message: noUpdatesErr}, postActions, nil
 				}
 			}
-			return output, errors.Wrap(err, "Failed to Update Stack")
+			return output, postActions, errors.Wrap(err, "Failed to Update Stack")
 		}
 	}
 	return
