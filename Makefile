@@ -48,7 +48,7 @@ godiff:
 BREW_FORMULA := homebrew/forge.rb
 brew-release:
 	$(eval FORGE_VERSION  ?= $(shell '$(BINARY)' --version | awk '{ print $$NF }'))
-	$(eval BIN_URL    := https://github.com/nathandines/forge/releases/download/$(FORGE_VERSION)/forge_$(FORGE_VERSION)_darwin_amd64)
+	$(eval BIN_URL    := https://github.com/deuscapturus/forge/releases/download/$(FORGE_VERSION)/forge_$(FORGE_VERSION)_darwin_amd64)
 	$(eval BIN_SHA256 := $(shell curl -o - -Ls '$(BIN_URL)' | shasum -a 256 | awk '{ print $$1 }'))
 	[ -d homebrew ] || git clone 'git@github.com:nathandines/homebrew-tap.git' 'homebrew'
 	sed -e 's;{{ bin_url }};$(BIN_URL);g' \
@@ -66,8 +66,8 @@ CHOCO_NUSPEC     := $(CHOCO_FORGE_PATH)/forge.nuspec
 LICENSE_COMMIT   ?= master
 choco-package:
 	$(eval FORGE_VERSION ?= $(shell '$(BINARY)' --version | awk '{ print $$NF }'))
-	$(eval URL_x64 := https://github.com/nathandines/forge/releases/download/$(FORGE_VERSION)/forge_$(FORGE_VERSION)_windows_amd64.exe)
-	$(eval URL_386 := https://github.com/nathandines/forge/releases/download/$(FORGE_VERSION)/forge_$(FORGE_VERSION)_windows_386.exe)
+	$(eval URL_x64 := https://github.com/deuscapturus/forge/releases/download/$(FORGE_VERSION)/forge_$(FORGE_VERSION)_windows_amd64.exe)
+	$(eval URL_386 := https://github.com/deuscapturus/forge/releases/download/$(FORGE_VERSION)/forge_$(FORGE_VERSION)_windows_386.exe)
 	mkdir -p '$(CHOCO_FORGE_PATH)/tools'
 	rm -f '$(CHOCO_FORGE_PATH)/tools/forge_'*.zip
 	cp LICENSE '$(CHOCO_FORGE_PATH)/tools/LICENSE.txt'

@@ -1,9 +1,9 @@
 # Forge
 
 [![CircleCI](https://img.shields.io/circleci/project/github/nathandines/forge/master.svg)](https://circleci.com/gh/nathandines/forge)
-[![GitHub Release](https://img.shields.io/github/release/nathandines/forge.svg)](https://github.com/nathandines/forge/releases/latest)
-[![Github All Releases](https://img.shields.io/github/downloads/nathandines/forge/total.svg)](https://github.com/nathandines/forge/releases)
-[![Go Report Card](https://goreportcard.com/badge/github.com/nathandines/forge)](https://goreportcard.com/report/github.com/nathandines/forge)
+[![GitHub Release](https://img.shields.io/github/release/nathandines/forge.svg)](https://github.com/deuscapturus/forge/releases/latest)
+[![Github All Releases](https://img.shields.io/github/downloads/nathandines/forge/total.svg)](https://github.com/deuscapturus/forge/releases)
+[![Go Report Card](https://goreportcard.com/badge/github.com/deuscapturus/forge)](https://goreportcard.com/report/github.com/deuscapturus/forge)
 [![Docker Image](https://img.shields.io/badge/docker-nathandines%2Fforge-blue.svg)](https://hub.docker.com/r/nathandines/forge/)
 
 _Forge_ is a simple tool which makes deploying CloudFormation stacks a bit
@@ -65,7 +65,7 @@ choco install forge
 ### Other
 
 Go to the [latest release page on
-GitHub](https://github.com/nathandines/forge/releases/latest) to download the
+GitHub](https://github.com/deuscapturus/forge/releases/latest) to download the
 latest stable version.
 
 Next, move the downloaded binary to a directory which is on your path, and

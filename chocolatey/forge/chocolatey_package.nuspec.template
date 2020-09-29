@@ -4,18 +4,18 @@
   <metadata>
     <id>forge</id>
     <version>{{ package_version }}</version>
-    <packageSourceUrl>https://github.com/nathandines/forge</packageSourceUrl>
+    <packageSourceUrl>https://github.com/deuscapturus/forge</packageSourceUrl>
     <owners>Nathan Dines</owners>
 
     <title>forge</title>
     <authors>Nathan Dines</authors>
-    <projectUrl>https://github.com/nathandines/forge</projectUrl>
+    <projectUrl>https://github.com/deuscapturus/forge</projectUrl>
     <copyright>2018 Nathan Dines</copyright>
-    <licenseUrl>https://github.com/nathandines/forge/blob/master/LICENSE</licenseUrl>
+    <licenseUrl>https://github.com/deuscapturus/forge/blob/master/LICENSE</licenseUrl>
     <requireLicenseAcceptance>false</requireLicenseAcceptance>
-    <projectSourceUrl>https://github.com/nathandines/forge</projectSourceUrl>
-    <bugTrackerUrl>https://github.com/nathandines/forge/issues</bugTrackerUrl>
-    <releaseNotes>https://github.com/nathandines/forge/releases/tag/v{{ package_version }}</releaseNotes>
+    <projectSourceUrl>https://github.com/deuscapturus/forge</projectSourceUrl>
+    <bugTrackerUrl>https://github.com/deuscapturus/forge/issues</bugTrackerUrl>
+    <releaseNotes>https://github.com/deuscapturus/forge/releases/tag/v{{ package_version }}</releaseNotes>
     <tags>forge cloudformation aws golang continuous-delivery</tags>
     <summary>Continuous Delivery friendly CloudFormation deployment tool</summary>
     <description>

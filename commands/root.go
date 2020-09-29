@@ -8,7 +8,7 @@ import (
 	"regexp"
 	"time"
 
-	forge "github.com/nathandines/forge/v2/forgelib"
+	forge "github.com/deuscapturus/forge/v2/forgelib"
 
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/credentials/stscreds"
@@ -30,7 +30,7 @@ var rootCmd = &cobra.Command{
 Forge is a simple tool which makes deploying CloudFormation stacks a bit more
 friendly for continuous delivery environments.
 
-GitHub: https://github.com/nathandines/forge
+GitHub: https://github.com/deuscapturus/forge
 `,
 	Version: "v2.3.0",
 }

@@ -1,4 +1,4 @@
-module github.com/nathandines/forge/v2
+module github.com/deuscapturus/forge/v2
 
 require (
 	github.com/aws/aws-sdk-go v1.29.11
